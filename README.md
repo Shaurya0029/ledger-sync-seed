@@ -172,6 +172,31 @@ many it returned, at 100,000 transactions.** DynamoDB gives you `ScannedCount`
 and `Count`; MongoDB gives you `totalDocsExamined` and `nReturned`. Put the six
 numbers in your README.
 
+MongoDB was chosen over DynamoDB — full rationale in `DECISIONS.md` (#8) and
+in `MongoDocumentStore`'s class doc, including the DynamoDB-equivalent index
+mapping. Document shape and index design are documented in the same class doc.
+
+Bring the store up with `docker compose up`, then:
+
+```bash
+./gradlew runDocumentStoreCli --args="backfill"
+./gradlew runDocumentStoreCli --args="seed-documents 100000"
+./gradlew runDocumentStoreCli --args="query-stats"
+./gradlew runDocumentStoreCli --args="check-consistency"
+```
+
+**Examined vs returned at 100,000 transactions** (from `query-stats` above —
+TODO: fill in after running the commands above against a real MongoDB; this
+submission's build environment had no Docker daemon and no route to Maven
+Central, so this could be reviewed by hand against the driver's API but not
+executed — see `DECISIONS.md` #11):
+
+| Query | examined | returned |
+|---|---|---|
+| Q1 `forAccountMonth` | TODO | TODO |
+| Q2 `categoryTotals` | TODO | TODO |
+| Q3 `byMessageId` | TODO | TODO |
+
 Then:
 
 - **`Backfill`** moves what is already in SQL across. Two things to know: the
@@ -195,3 +220,12 @@ Then:
   could have asked is a worse signal than asking.
 
 `talent.acquisition@simplifymoney.in`
+
+---
+
+## Decision log, incident writeup, AI usage
+
+`DECISIONS.md` has the full rationale for every non-obvious choice in this
+submission, including which parts could and couldn't be verified in the build
+environment used, and an AI usage disclosure. `incident/RESOLUTION.md` is the
+five-line incident-channel note for INC-2026-09-11.
