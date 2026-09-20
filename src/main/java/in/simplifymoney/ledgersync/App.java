@@ -7,6 +7,7 @@ import in.simplifymoney.ledgersync.report.Reports;
 import in.simplifymoney.ledgersync.store.SqlLedgerStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Command line entry point.
@@ -14,11 +15,19 @@ import java.nio.file.Path;
  *   migrate                  apply db/migration/*.sql
  *   ingest  <corpus.jsonl>   read a corpus into the ledger
  *   report  <out-dir>        write ledger.json, summary.json, reconciliation.json
+ *
+ * Document-store commands (backfill, check-consistency, seed-documents,
+ * query-stats) are in DocumentStoreCli, not here - see its class doc for why.
  */
 public final class App {
 
     private static final Path DB = Path.of("data", "ledger");
     private static final Path MIGRATIONS = Path.of("db", "migration");
+    // Reconciliation needs the bank-stated balances Deduper/Categorizer
+    // discard once NormalizedTxn is built, so `ingest` computes it once
+    // (while that evidence still exists) and leaves it here for a later,
+    // separate `report` run to pick back up - see IngestService's class doc.
+    private static final Path RECONCILIATION = Path.of("data", "reconciliation.json");
 
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
@@ -38,7 +47,7 @@ public final class App {
                 if (args.length < 2) throw new IllegalArgumentException("ingest needs a corpus");
                 try (SqlLedgerStore store = new SqlLedgerStore(DB)) {
                     store.migrate(MIGRATIONS);
-                    var stats = new IngestService(new Parsers(), store)
+                    var stats = new IngestService(new Parsers(), store, RECONCILIATION)
                             .ingestFile(Path.of(args[1]));
                     System.out.println(stats);
                     System.out.println("ledger rows: " + store.count());
@@ -54,8 +63,9 @@ public final class App {
                             Json.writePretty(Reports.ledgerDocument(ledger)));
                     Files.writeString(out.resolve("summary.json"),
                             Json.writePretty(Reports.summary(ledger)));
+
                     Files.writeString(out.resolve("reconciliation.json"),
-                            Json.writePretty(Reports.reconciliation(ledger)));
+                            Json.writePretty(Reports.reconciliation(readDiscrepancies())));
                     System.out.println("wrote 3 files to " + out);
                 }
             }
@@ -64,5 +74,12 @@ public final class App {
                 System.exit(2);
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> readDiscrepancies() throws java.io.IOException {
+        if (!Files.exists(RECONCILIATION)) return List.of();
+        Object parsed = Json.parse(Files.readString(RECONCILIATION));
+        return parsed instanceof List<?> list ? (List<Object>) list : List.of();
     }
 }
