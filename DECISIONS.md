@@ -107,7 +107,35 @@ up. See `incident/RESOLUTION.md` for the incident writeup specifically.
     See "Document store" in README.md for the exact commands and the six
     query-stats numbers that still need to be filled in from that run.
 
-12. **AI usage.** This submission was built working directly with Claude
+12. **What the real run (against actual MongoDB, actual `./gradlew`) found
+    that hand-review couldn't.** Two genuine bugs, both in code #11 flagged as
+    reviewed-but-unverified:
+    - `db/migration/V1__initial.sql` declared `id IDENTITY PRIMARY KEY`, but
+      `SqlLedgerStore` opens its H2 connection with `MODE=PostgreSQL`, which
+      does not recognize the bare `IDENTITY` type. `migrate` failed outright.
+      Never caught before because `verify.sh`/`SelfCheck` run entirely
+      in-memory (`InMemoryLedgerStore`) and never touch this migration.
+      Fixed to `BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`, which H2
+      accepts in both its default and PostgreSQL modes.
+    - `ConsistencyChecker.checkCategoryTotals` summed every raw SQL row by
+      category without first collapsing the duplicate rows `V2__seed.sql`
+      ships on purpose (the same merge `Backfill` and `checkByMessageId`
+      already do). Net effect: it would flag Backfill's own correct
+      deduplication as a permanent, unfixable "divergence" on every run —
+      173,160.47 vs 174,988.46 for account 4821/SPEND, the exact size of the
+      seeded duplicates, never zero no matter how correct the document store
+      was. Fixed to merge SQL rows by the same key before totaling; `check-
+      consistency` now correctly reports "no divergences found" once
+      `backfill` has run.
+
+    With both fixed: `./gradlew test` passes, `migrate` → `ingest` → `report`
+    reproduces the same account 9075 exact match / account 4821 ₹7,500 gap as
+    `verify.sh`, `backfill` reads 271 SQL rows and writes 266 documents (the
+    271 minus the 5 duplicate collapses `V2__seed.sql` ships — exactly
+    accounted for, 0 skipped), and `check-consistency` finds no divergences
+    after that. Query-stats numbers are in README.md's table.
+
+13. **AI usage.** This submission was built working directly with Claude
     (Anthropic), used as a pairing/drafting tool under my direction —
     reviewing the assignment, writing and reviewing code, and drafting this
     log — with me making the calls on approach and reviewing the output.

@@ -185,17 +185,20 @@ Bring the store up with `docker compose up`, then:
 ./gradlew runDocumentStoreCli --args="check-consistency"
 ```
 
-**Examined vs returned at 100,000 transactions** (from `query-stats` above —
-TODO: fill in after running the commands above against a real MongoDB; this
-submission's build environment had no Docker daemon and no route to Maven
-Central, so this could be reviewed by hand against the driver's API but not
-executed — see `DECISIONS.md` #11):
+**Examined vs returned at 100,000 transactions** (from `query-stats` above,
+run against a real `docker compose up` MongoDB — see `DECISIONS.md` #11 for
+what could and couldn't be verified before this run, and #13 for what this
+run itself found and fixed):
 
 | Query | examined | returned |
 |---|---|---|
-| Q1 `forAccountMonth` | TODO | TODO |
-| Q2 `categoryTotals` | TODO | TODO |
-| Q3 `byMessageId` | TODO | TODO |
+| Q1 `forAccountMonth` | 823 | 823 |
+| Q2 `categoryTotals` | 16,789 | 16,789 |
+| Q3 `byMessageId` | 1 | 1 |
+
+`examined == returned` on all three means every index is doing exactly the
+work it should: each query hits only the documents that match, not a wider
+scan that gets filtered down afterward.
 
 Then:
 

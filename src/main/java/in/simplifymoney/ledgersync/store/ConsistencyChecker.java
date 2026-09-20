@@ -107,8 +107,19 @@ public final class ConsistencyChecker {
     }
 
     private List<Divergence> checkCategoryTotals(List<NormalizedTxn> sqlRows) {
-        Map<String, Map<Category, BigDecimal>> sqlTotals = new TreeMap<>();
+        // SQL has no uniqueness guarantee (see Backfill's class doc): the same
+        // real transaction can appear as more than one row, distinguished
+        // only by message id. Summing raw rows would count it once per
+        // duplicate, so merge by the same key Backfill uses before totaling -
+        // otherwise this would flag Backfill's own correct deduplication as a
+        // divergence on every run.
+        Map<String, NormalizedTxn> repByKey = new LinkedHashMap<>();
         for (NormalizedTxn t : sqlRows) {
+            repByKey.putIfAbsent(mergeKey(t), t);
+        }
+
+        Map<String, Map<Category, BigDecimal>> sqlTotals = new TreeMap<>();
+        for (NormalizedTxn t : repByKey.values()) {
             sqlTotals.computeIfAbsent(t.accountLast4(), k -> new EnumMap<>(Category.class))
                     .merge(t.category(), t.amount(), BigDecimal::add);
         }
