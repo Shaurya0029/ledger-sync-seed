@@ -18,6 +18,10 @@ dependencies {
     // runtime dependency only. Add whatever you need for your document store.
     runtimeOnly 'com.h2database:h2:2.2.224'
 
+    // Document store (see store/MongoDocumentStore.java and the "Document
+    // store" section of README.md / DECISIONS.md for why Mongo over Dynamo).
+    implementation 'org.mongodb:mongodb-driver-sync:5.1.1'
+
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -34,4 +38,16 @@ tasks.register('selfCheck', JavaExec) {
     group = 'verification'
     mainClass = 'in.simplifymoney.ledgersync.SelfCheck'
     classpath = sourceSets.main.runtimeClasspath
+}
+
+// backfill / check-consistency / seed-documents / query-stats - the Task 4
+// commands, kept off the default `run` (App.main) on purpose; see
+// DocumentStoreCli's class doc. Needs MongoDB: `docker compose up`.
+tasks.register('runDocumentStoreCli', JavaExec) {
+    group = 'application'
+    mainClass = 'in.simplifymoney.ledgersync.DocumentStoreCli'
+    classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty('args')) {
+        args project.getProperty('args').split(' ')
+    }
 }
